@@ -2,12 +2,11 @@
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
   <channel>
     <title>Sadique Ali</title>
-    <link>http://sadique.io/index.xml</link>
+    <link>http://sadique.io/categories/development/index.xml</link>
     <description>Recent content on Sadique Ali</description>
     <generator>Hugo -- gohugo.io</generator>
     <language>en-US</language>
-    <lastBuildDate>Wed, 02 Nov 2016 13:10:33 -0700</lastBuildDate>
-    <atom:link href="http://sadique.io/index.xml" rel="self" type="application/rss+xml" />
+    <atom:link href="http://sadique.io/categories/development/index.xml" rel="self" type="application/rss+xml" />
     
     <item>
       <title>Handling Deserialization errors in Spring Redis Sessions</title>

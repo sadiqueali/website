@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en-US">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="author" content="map[]" />
+    <meta name="description" content="Thoughs on Software">
+    <link rel="shortcut icon" type="image/x-icon" href="http://sadique.io/img/favicon.ico">
+    <title>Handling Deserialization errors in Spring Redis Sessions</title>
+    <meta name="generator" content="Hugo 0.17" />
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/css/bootstrap.min.css" integrity="sha384-BVYiiSIFeK1dGmJRAkycuHAHRg32OmUcww7on3RYdg4Va+PmSTsz/K68vbdEjh4u" crossorigin="anonymous">
+    <link rel="stylesheet" type="text/css" href="http://sadique.io/css/main.css" />
+    <link rel="stylesheet" type="text/css" href="https://maxcdn.bootstrapcdn.com/font-awesome/4.6.3/css/font-awesome.min.css" />
+    <link rel="stylesheet" type="text/css" href="https://fonts.googleapis.com/css?family=Source+Sans+Pro:200,400,200bold,400old" />
+    
+    <!--[if lt IE 9]>
+			<script src="https://oss.maxcdn.com/libs/html5shiv/3.7.0/html5shiv.js"></script>
+			<script src="https://oss.maxcdn.com/libs/respond.js/1.4.2/respond.min.js"></script>
+		<![endif]-->
+
+    
+<script>
+(function(i,s,o,g,r,a,m){i['GoogleAnalyticsObject']=r;i[r]=i[r]||function(){
+(i[r].q=i[r].q||[]).push(arguments)},i[r].l=1*new Date();a=s.createElement(o),
+m=s.getElementsByTagName(o)[0];a.async=1;a.src=g;m.parentNode.insertBefore(a,m)
+})(window,document,'script','//www.google-analytics.com/analytics.js','ga');
+
+ga('create', 'UA-86790710-1', 'auto');
+ga('send', 'pageview');
+</script>
+
+  </head>
+
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:site" content="">
+  <meta name="twitter:creator" content="SadiqueIO">
+  <meta name="twitter:title" content="Handling Deserialization errors in Spring Redis Sessions">
+  <meta name="twitter:description" content="One of the challenges of using storing spring sessions in Redis is that the objects that gets stored as part of a session often undergoes changes as the application evolves and these changes cause de-serialization exceptions to be thrown after a deployment when a session created before the deployment is presented to the application. This blog post discusses a method to work around this issue.
+
+">
+  <meta name="twitter:image" content="http://sadique.io//img/redis-spring-boot.png">
+
+  <meta property="og:title" content="Handling Deserialization errors in Spring Redis Sessions" />
+  <meta property="og:description" content="One of the challenges of using storing spring sessions in Redis is that the objects that gets stored as part of a session often undergoes changes as the application evolves and these changes cause de-serialization exceptions to be thrown after a deployment when a session created before the deployment is presented to the application. This blog post discusses a method to work around this issue.
+
+" itemprop="description"/>
+  <meta property="og:url" content="http://sadique.io/blog/2016/11/02/handling-deserialization-errors-in-spring-redis-sessions/" />
+  <meta property="og:image" content="http://sadique.io//img/redis-spring-boot.png" />
+
+  <body>
+    <div id="wrap">
+
+      
+      <nav class="navbar navbar-default">
+  <div class="container">
+    <div class="navbar-header">
+      <a class="navbar-brand" href="http://sadique.io/"><i class="fa fa-home"></i></a>
+    </div>
+    <div id="navbar">
+      <ul class="nav navbar-nav navbar-right">
+      
+        
+        <li><a href="/blog/">BLOG</a></li>
+        
+      
+      </ul>
+    </div>
+  </div>
+</nav>
+
+      
+      <div class="container">
+        <div class="blog-post">
+          <h3>
+            <strong><a href="http://sadique.io/blog/2016/11/02/handling-deserialization-errors-in-spring-redis-sessions/">Handling Deserialization errors in Spring Redis Sessions</a></strong>
+          </h3>
+        </div>
+        <div class="blog-title">
+          <h4>
+          November 2, 2016
+            &nbsp;&nbsp;
+            
+            <span class="label label-success">Development</span>
+            
+            <span class="label label-success">Java</span>
+            
+            <span class="label label-success">Spring</span>
+            
+            <span class="label label-success">Redis</span>
+            
+          </h4>
+        </div>
+        <div class="panel panel-default">
+          <div class="panel-body">
+            <div class="blogpost">
+              <p>One of the challenges of using storing spring sessions in Redis is that the objects that gets stored as part of a session often undergoes changes as the application evolves and these changes cause de-serialization exceptions to be thrown after a deployment when a session created before the deployment is presented to the application. This blog post discusses a method to work around this issue.</p>
+
+<p></p>
+
+<h2 id="the-issue">The issue</h2>
+
+<p>Consider an application that uses a custom authentication service to validate credentials presented by a client. To achieve this, we will wire up a custom authentication provider which creates an object <code>Customer</code> as the authenticated user in session.</p>
+
+<pre><code class="language-java">public class Customer extends User {
+  public Customer(String name) {
+    super(name, &quot;&quot;, Collections.singletonList(new SimpleGrantedAuthority(&quot;USER&quot;)));
+  }
+}
+</code></pre>
+
+<p>Things work great, but after a while the team decides to store the logged in user&rsquo;s email address in the session. To achieve this, we change the <code>Customer</code> type to:</p>
+
+<pre><code class="language-java">public class Customer extends User {
+  private String email;
+
+  public Customer(String name, String email) {
+    super(name, &quot;&quot;, Collections.singletonList(new SimpleGrantedAuthority(&quot;USER&quot;)));
+    this.email = email;
+  }
+
+  public String getEmail() {
+    return email;
+  }
+
+  public void setEmail(String email) {
+    this.email = email;
+  }
+}
+</code></pre>
+
+<p>When this code is deployed and a user tries to access a protected resource by presenting a session created before the deployment, an exception is thrown.</p>
+
+<pre><code>org.springframework.data.redis.serializer.SerializationException: Cannot deserialize; nested exception is org.springframework.core.serializer.support.SerializationFailedException: Failed to deserialize payload. Is the byte array a result of corresponding serialization for DefaultDeserializer?; nested exception is java.io.InvalidClassException: in.sdqali.spring.vo.Customer; local class incompatible: stream classdesc serialVersionUID = 5161850915957547690, local class serialVersionUID = 1045726772100761661
+</code></pre>
+
+<p>This happens because the serialized object in the session and the current structure of the session differ.</p>
+
+<h2 id="solutions">Solutions</h2>
+
+<p>This issue was raised on the Spring Session issue tracker <sup class="footnote-ref" id="fnref:1"><a rel="footnote" href="#fn:1">1</a></sup> and there were a lot of work-arounds discussed. Of the work arounds, wrapping the session repository offers the least disruption to the end user.
+This approach ensures that every time a de-serialization error is thrown while trying to read an object from the session, that object is deleted, preventing subsequent errors.</p>
+
+<pre><code class="language-java">public class SafeDeserializationRepository&lt;S extends ExpiringSession&gt; implements SessionRepository&lt;S&gt; {
+  private final SessionRepository&lt;S&gt; delegate;
+  private final RedisTemplate&lt;Object, Object&gt; redisTemplate;
+
+  private static final String BOUNDED_HASH_KEY_PREFIX = &quot;spring:session:sessions:&quot;;
+  private static final Logger logger = getLogger(SafeDeserializationRepository.class);
+
+  public SafeDeserializationRepository(SessionRepository&lt;S&gt; delegate,
+                                       RedisTemplate&lt;Object, Object&gt; redisTemplate) {
+    this.delegate = delegate;
+    this.redisTemplate = redisTemplate;
+  }
+
+  @Override
+  public S createSession() {
+    return delegate.createSession();
+  }
+
+  @Override
+  public void save(S session) {
+    delegate.save(session);
+  }
+
+  @Override
+  public S getSession(String id) {
+    try {
+      return delegate.getSession(id);
+    } catch(SerializationException e) {
+      logger.info(&quot;Deleting non-deserializable session with key {}&quot;, id);
+      redisTemplate.delete(BOUNDED_HASH_KEY_PREFIX + id);
+      return null;
+    }
+  }
+
+  @Override
+  public void delete(String id) {
+    delegate.delete(id);
+  }
+}
+</code></pre>
+
+<p>However, it is not easy to wire up this repository in the configuration. Since Spring Redis Session is auto configured, the only way to override beans for Redis Session is to extend <code>RedisHttpSessionConfiguration</code> and specify beans. Ideally, we want to override the method <code>org.springframework.session.data.redis.config.annotation.web.http.RedisHttpSessionConfiguration#sessionRepository</code>. This would mean that <code>SafeDeserializationRepository</code> inherits from <code>RedisOperationsSessionRepository</code>. That does not sound too complicated till you realize that <code>org.springframework.session.data.redis.RedisOperationsSessionRepository#getSession(java.lang.String)</code> returns <code>RedisSession</code> which is a final class declared inside <code>RedisOperationsSessionRepository</code>.</p>
+
+<p>On closer look, the repository is hooked in to <code>SessionRepositoryFilter</code> and it is indeed possible to override the <code>org.springframework.session.config.annotation.web.http.SpringHttpSessionConfiguration#springSessionRepositoryFilter</code> method to create a new filter that takes our <code>SafeDeserializationRepository</code>.</p>
+
+<pre><code class="language-java">@Configuration
+public class RedisSessionConfig extends RedisHttpSessionConfiguration {
+  @Autowired
+  RedisTemplate&lt;Object, Object&gt; redisTemplate;
+
+  @Bean
+  @Override
+  public &lt;S extends ExpiringSession&gt; SessionRepositoryFilter&lt;? extends ExpiringSession&gt; springSessionRepositoryFilter(SessionRepository&lt;S&gt; sessionRepository) {
+    return super.springSessionRepositoryFilter(new SafeDeserializationRepository&lt;&gt;(sessionRepository, redisTemplate));
+  }
+}
+</code></pre>
+
+<p>There is an example of using this approach <a href="https://github.com/sadiqueali/safe-spring-redis-session">on GitHub</a>.</p>
+<div class="footnotes">
+
+<hr />
+
+<ol>
+<li id="fn:1"><a href="https://github.com/spring-projects/spring-session/issues/280">SerializationFailedException after re-deploying with changed session object #280</a>.
+ <a class="footnote-return" href="#fnref:1"><sup>[return]</sup></a></li>
+</ol>
+</div>
+              <hr>
+              <div class="related-posts">
+                <h5>Related Posts</h5>
+                
+              </div>
+            </div>
+          </div>
+          <hr>
+        <div class="disqus">
+  <div id="disqus_thread"></div>
+  <script type="text/javascript">
+
+    (function() {
+      
+      
+      if (window.location.hostname == "localhost")
+        return;
+
+      var disqus_shortname = '';
+      var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+      dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+      (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+    })();
+  </script>
+  <noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+  <a href="http://disqus.com/" class="dsq-brlink">comments powered by <span class="logo-disqus">Disqus</span></a>
+</div>
+        </div>
+      
+      </div>
+    </div>
+
+    
+    <footer>
+  <div id="footer">
+    <div class="container">
+      <p class="text-muted">&copy; All rights reserved. Powered by <a href="https://gohugo.io/">Hugo</a> and
+      <a href="http://www.github.com/sumaxime/hugo-sustain/">sustain</a> with ♥</p>
+    </div>
+  </div>
+</footer>
+<div class="footer"></div>
+
+
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js"></script>
+
+<script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.7/js/bootstrap.min.js" integrity="sha384-Tc5IQib027qvyjSMfHjOMaLkfuWVxZxUPnCJA7l2mCWNIpG9mGCD8wGNIcPD7Txa" crossorigin="anonymous"></script>
+<script src="http://sadique.io/js/docs.min.js"></script>
+<script src="http://sadique.io/js/main.js"></script>
+
+<script src="http://sadique.io/js/ie10-viewport-bug-workaround.js"></script>
+
+
+    
+  </body>
+</html>
