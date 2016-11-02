@@ -118,8 +118,6 @@ public class RedisSessionConfig extends RedisHttpSessionConfiguration {
   }
 }
 &lt;/code&gt;&lt;/pre&gt;
-
-&lt;p&gt;There is an example of using this approach &lt;a href=&#34;https://github.com/sadiqueali/safe-spring-redis-session&#34;&gt;on GitHub&lt;/a&gt;.&lt;/p&gt;
 &lt;div class=&#34;footnotes&#34;&gt;
 
 &lt;hr /&gt;
