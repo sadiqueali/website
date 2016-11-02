@@ -1,0 +1,29 @@
+baseurl = "http://sadique.io/"
+languageCode = "en-US"
+title = "Sadique Ali"
+
+[permalinks]
+  blog = "/blog/:year/:month/:day/:title/"
+
+[params]
+  avatar = "profile.jpg"
+  author = "Sadique Ali"
+  description = "Thoughs on Software"
+
+  # Custom assets can be linked with their paths relative to static/
+  custom_css = []
+  custom_js  = []
+
+[social]
+  Github        = "sadiqueali"
+  Email         = "sadique@sadique.io"
+  Twitter       = "SadiqueIO"
+  LinkedIn      = ""
+  Stackoverflow = ""
+
+## Main Menu
+[[menu.main]]
+  name = "blog"
+  weight = 100
+  identifier = "blog"
+  url = "/blog/"
