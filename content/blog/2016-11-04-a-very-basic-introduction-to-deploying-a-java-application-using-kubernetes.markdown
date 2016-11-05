@@ -9,7 +9,7 @@ Tags:
 - Docker
 - Kubernetes
 date: 2016-11-04T22:34:53-07:00
-image: ""
+image: "img/KubernetesLogo.png"
 title: A very basic introduction to deploying a Java application using Kubernetes
 ---
 
