@@ -2,6 +2,7 @@ baseurl = "http://sadique.io/"
 languageCode = "en-US"
 title = "Sadique Ali"
 googleAnalytics = "UA-86790710-1"
+metadataformat = "yaml"
 [permalinks]
   blog = "/blog/:year/:month/:day/:title/"
 
