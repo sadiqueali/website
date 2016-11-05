@@ -88,9 +88,9 @@ We will define a Kubernetes service object for this application `hello-world-ser
 apiVersion: v1
 kind: Service
 metadata:
-  name: config-server
+  name: hello-world
   labels:
-    app: config-server
+    app: hello-world
     tier: backend
 spec:
   type: NodePort
@@ -98,7 +98,7 @@ spec:
     # the port that this service should serve on
   - port: 8080
   selector:
-    app: config-server
+    app: hello-world
     tier: backend
 ```
 
@@ -130,7 +130,7 @@ spec:
         tier: backend
     spec:
       containers:
-      - name: config-server
+      - name: hello-world
         image: 192.168.99.100:80/hello-world
         resources:
           requests:
