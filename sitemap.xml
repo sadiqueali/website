@@ -3,17 +3,6 @@
   
   <url>
     <loc>http://sadique.io/</loc>
-    <lastmod>2016-11-04T22:34:53-07:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>http://sadique.io/blog/2016/11/04/a-very-basic-introduction-to-deploying-a-java-application-using-kubernetes/</loc>
-    <lastmod>2016-11-04T22:34:53-07:00</lastmod>
-  </url>
-  
-  <url>
-    <loc>http://sadique.io/blog/2016/11/02/handling-deserialization-errors-in-spring-redis-sessions/</loc>
-    <lastmod>2016-11-02T13:10:33-07:00</lastmod>
   </url>
   
 </urlset>
